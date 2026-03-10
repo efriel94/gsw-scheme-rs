@@ -1,9 +1,10 @@
+use gsw_scheme::util::{reduce_mod_q, sample_uniform_distribution_random_element_mod_q};
+
 
 fn main() {
     println!("Hello, world!");
 
 }
-
 
 // Setup 
 #[derive()]
@@ -17,27 +18,66 @@ pub struct GswParameters {
 }
 
 impl GswParameters {
-    fn setup(&self) -> Self {
-        GswParameters { 
+    fn compute_params(&mut self) {
+        let l = ((self.q as f64).log2().floor() + 1.0) as usize;
+        let large_n = (self.n + 1) * l;
+
+        self.l = l as usize;
+        self.large_n = large_n;
+    }
+
+    fn from(&self) -> Self {
+        let mut params = GswParameters { 
             n: (self.n), 
             q: (self.q), 
             chi: (self.chi), 
-            m: (self.m), 
-            l: (((self.q as f64).log2() + 1.0).floor() as usize), 
-            large_n: ((self.n + 1) * self.l),  
-        }
+            m: (self.m),
+            l: (0),
+            large_n: (0)
+        };
+        params.compute_params();
+        params
     }
 }
 
 // Secret key (secret eigenvector) s is a Powersof2(s) representation
-// Powersof2(s) = (s, 2s_1, ... , 2^{l - 1}s_1 , ...., 2s_k , 2^{l - 1}s_{k})
+// Stores a Powersof2(s) = (s, 2s_1, ... , 2^{l - 1}s_1 , ...., 2s_k , 2^{l - 1}s_{k})
 struct GswSecretKey {
 
+    sk: Vec<u64>
+}
+
+impl GswSecretKey {
     // Sample eigenvector t over Z_q of size n
+    // Generate base eigenvector v the form: v <- (1, -t_1, .... -t_n)
+    // Return sk = Powersof2(v)  
+    fn generate(parameters: &GswParameters) -> Self {
 
-    // Generate secret key eigenvector sk of the form: sk <- (1, -t_1, .... -t_n)
+        let n = parameters.n;
+        let q = parameters.q;
 
-    // Return Powersof2(sk) 
+        let mut base_vector_t = vec![0; n + 1];
+        base_vector_t[0] = 1;
+        
+        //sample base elements over uniform distribution mod q
+        for coeff in base_vector_t.iter_mut().skip(1) {
+            *coeff = sample_uniform_distribution_random_element_mod_q(&q);
+        }
+
+        // negate elements, skipping the first coeff to be in the form: v <- (1, -t_1, .... -t_n)
+        // Negation over Z_q: -x = q - x (mod q)
+        for coeff in base_vector_t.iter_mut().skip(1) {
+            *coeff = if *coeff == q { 0 } else { q - *coeff };
+        }
+
+        // return the Powersof2 representation
+        let sk_powers_of_two = powers_of_two_decomposition(parameters, &base_vector_t);
+        
+        Self { sk: (
+            sk_powers_of_two
+        ) }
+
+    }
 }
 
 // Public key    
@@ -107,9 +147,30 @@ fn flatten(parameters: GswParameters, input_eigenvector: Vec<u64>) -> Vec<u64> {
 
 // Powersof2(a)
 // Input: Eigenvector a with coefficents over Z_q
-// Output:  Eigenvector of the form (a_1, 2a_1, ... , 2^{l-1}a_1, ... , a_k, 2a_k, 2^{l-1}a_k) of size N = k*l
-fn powers_of_two_decomposition(parameters: GswParameters, input_eigenvector: Vec<u64>) -> Vec<u64> {
-    todo!()
+// Output:  Eigenvector of the form (a_1, 2a_1, ... , 2^{l-1}a_1, ... , a_k, 2a_k, 2^{l-1}a_k) of size N = k*l,
+// with coefficents a_i in Z_q
+fn powers_of_two_decomposition(parameters: &GswParameters, input_eigenvector: &[u64]) -> Vec<u64> {
+
+    let l = parameters.l;   
+    let k = input_eigenvector.len(); 
+    let q = parameters.q;
+
+    let mut output_vec: Vec<u64> = Vec::with_capacity((k * l));
+
+    // so we want to loop over the current input vector
+    // multiply each element by a power of two
+    // reduce mod q
+    // up to a level l of floor(log q) + 1
+    for a_i in input_eigenvector {
+        let mut current = *a_i;
+        for i in 0..l {
+            output_vec.push(current);
+            current = reduce_mod_q((current as u128) * 2u128, &(q as u128)) as u64;
+        }
+    }
+
+    output_vec 
+    
 }
 
 // Generate a N dimension Identity matrix, I_N
