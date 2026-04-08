@@ -155,16 +155,6 @@ impl GswKeyPair {
     }
 }
 
-// Secret Key generation
-fn secret_key_gen(parameters: GswParameters) -> GswSecretKey {
-    todo!()
-} 
-
-//Public Key generation
-fn public_key_gen(parameters: GswParameters, sk: GswSecretKey) -> GswPublicKey {
-    todo!()
-}
-
 // GSW Encryption
 // Encrypt a message u \in Z_q 
 // Outputs matrix with coefficents \in Zq of size N x N where N = k * l  
