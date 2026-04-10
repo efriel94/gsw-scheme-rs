@@ -1,4 +1,4 @@
-use std::vec;
+use std::{vec};
 
 use rand::Rng;
 use crate::util::*;
@@ -171,15 +171,49 @@ fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) ->
 // Input: Eigenvector a with coefficents over Z_q
 // Output: Bit decomposed representation (a_{1,0}, ... , a_{1, l-1}, ... , a_{k,0} , .... , a_{k, l-1}) ,
 // where l = floor(log) + 1
-fn bit_decomposition_vector(parameters: GswParameters, input_eigenvector: Vec<u64>) -> Vec<u64> {
-    todo!()
+// Ordered from LSB to MSB
+fn bit_decomposition(parameters: GswParameters, input_eigenvector: &Vec<u64>) -> Vec<u64> {
+
+    // for every element in the vector we break each one into l (\elle) bits
+    let output_len = input_eigenvector.len() * parameters.l;
+    let mut output_vec = Vec::with_capacity(output_len);
+
+    for &ai in input_eigenvector.iter().as_ref() {
+        for j in 0..parameters.l {
+            output_vec.push((ai >> j) & 1);    
+        }
+    }
+
+    output_vec
+
+
 }
 
 // BitDecomp^{-1}(a)
-// Input: Eigenvector a with coefficents over Z_q
+// Input: Eigenvector a with coefficents a_i over Z_q
 // Output: Inverse bit decomposition representation (\sum(2^j * a_{1,j} , ... , \sum(2^j * a_{k,j}))
-fn inverse_bit_decomposition_vector(parameters: GswParameters, input_eigenvector: Vec<u64>) -> Vec<u64> {
-    todo!()
+fn inverse_bit_decomposition(parameters: GswParameters, input_eigenvector: Vec<u64>) -> Vec<u64> {
+    
+    let k = input_eigenvector.len() / parameters.l;
+    let bit_level = parameters.l;
+    let mut output_vec: Vec<u64> = Vec::with_capacity(k);
+
+    // loop over k elements
+    for i in 0..k {
+        
+        let mut value = 0 as u128;
+
+        // for each k-th element, reconstruct the original coefficent value from j bits
+        for j in 0..bit_level {
+            let coeff_value = input_eigenvector[i * bit_level + j] as u128;
+            value += coeff_value << j; // coeff * 2^j
+        }
+
+        output_vec.push(value as u64);
+    }
+
+    output_vec
+
 }
 
 // Flatten(a)
