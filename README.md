@@ -7,3 +7,4 @@ The GSW scheme is SHE (Somewhat Homomorphic Encryption) scheme that supports add
 
 ## References
 
+[Original GSW Paper, June 2013](https://eprint.iacr.org/2013/340.pdf)
