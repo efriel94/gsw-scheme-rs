@@ -1,3 +1,5 @@
+use std::vec;
+
 use rand::{Rng, RngExt};
 use rand_distr::{Normal,Distribution};
 
@@ -22,7 +24,7 @@ pub fn reduce_mod_q(input_element: u128, q: &u128) -> u128 {
 }
 
 
-//sample random e_i \in [-B, B]
+// Sample random e_i \in [-B, B]
 fn sample_bounded_error<R: Rng>(rng: &mut R, error_bound: i64) -> i64 {
     if error_bound <= 0 {
         return 0;
@@ -30,8 +32,8 @@ fn sample_bounded_error<R: Rng>(rng: &mut R, error_bound: i64) -> i64 {
     rng.random_range(-error_bound..=error_bound)
 }
 
-//sample an error eigenvector of distribution X^m (chi) where X distributionm is B-bounded
-//The coefficents e_i of the eigenvector e, e_i \in [-B, B]
+// Sample an error eigenvector of distribution X^m (chi) where X distributionm is B-bounded
+// The coefficents e_i of the eigenvector e, e_i \in [-B, B]
 pub fn sample_error_eigenvector<R: Rng>(rng: &mut R, error_bound: i64, size_m: usize) -> Vec<i64> {
 
     let mut e_vec = Vec::with_capacity(size_m);
@@ -42,3 +44,127 @@ pub fn sample_error_eigenvector<R: Rng>(rng: &mut R, error_bound: i64, size_m: u
     e_vec
 
 }
+
+
+pub fn matrix_vector_multiplication_mod_q(
+    input_matrix_a: &[Vec<u64>],
+    input_vector_b: &[u64],
+    modulus: u128,
+) -> Vec<u64> {
+
+    let rows_a = input_matrix_a.len();
+    let cols_a = input_matrix_a[0].len();
+    let vector_b_len = input_vector_b.len();
+
+    assert!(
+        cols_a == vector_b_len, 
+        "Incompatible dimensions for matrix-vector multiplication, got cols input matrix A {}, got vector len {}",
+        cols_a,
+        vector_b_len,
+    );
+
+    let mut output_vec = vec![0u64; rows_a];
+
+    for i in 0..rows_a {
+        let mut sum = 0;
+        for j in 0..cols_a {
+            let aij = input_matrix_a[i][j] as u128;
+            let bi = input_vector_b[j] as u128;
+            let result = (aij * bi);
+            sum += result;
+        }
+        output_vec[i] = (sum % modulus) as u64;
+    }
+
+    output_vec
+
+}
+
+
+pub fn schoolbook_matrix_multiplication_mod_q(
+    input_matrix_a: Vec<Vec<u64>>, 
+    input_matrix_b: Vec<Vec<u64>>, 
+    modulus: u128
+) -> Vec<Vec<u64>> {
+
+    let rows_a = input_matrix_a.len();
+    let cols_a = input_matrix_a[0].len();
+    let rows_b = input_matrix_b.len();
+    let cols_b = input_matrix_b[0].len();
+
+    assert!(rows_a > 0 && cols_a > 0, "input matrix a must be non empty");
+    assert!(rows_b > 0 && cols_b > 0, "input matrix b must be non empty");
+    assert!(rows_a == cols_b, "matrix dimensions do not align for matrix multiplication");
+
+    let mut output_vec: Vec<Vec<u64>> = Vec::with_capacity(rows_a * cols_b);
+
+    for i in 0..rows_a {
+        for j in 0..cols_b {
+            let mut sum = 0;
+            for k in 0..cols_a {
+
+                let mult_result = (input_matrix_a[i][k] * input_matrix_b[k][j]) as u128;
+                sum += mult_result
+            }
+            output_vec[i][j] = (sum % modulus) as u64;
+        }
+    }
+
+    output_vec
+
+}
+
+// Compute b = B*t + e (mod q) , where
+// matrix B \in Z_q of size m x n
+// vector t \in Z_q of size m x 1
+// vector e sampled from distribution Chi of size m where cofficents e_i is sampled in the B-bounded interval [-B, B]
+// Outputs a vector b \in Z_q of size m x 1 
+pub fn body(
+    input_matrix_b: &[Vec<u64>],
+    input_vector_t: &[u64],
+    input_vector_e: &[i64],
+    modulus: u128,
+) -> Vec<u64> {
+
+    let total_rows_matrix_b = input_matrix_b.len();
+    let total_cols_matrix_b = input_matrix_b[0].len();
+    let total_len_vector_t = input_vector_t.len();
+
+    assert!(
+        total_cols_matrix_b == total_len_vector_t,
+        "Incompatible dimensions for matrix-vector multiplication. Matrix columns {}, Vector length {}",
+        total_cols_matrix_b,
+        total_len_vector_t
+    );
+    
+    let mut output_vector = vec![0u64; total_rows_matrix_b];
+    
+    // Compute B*t + e (mod q)
+    // \sum_{j=0}^{n-1} B_{i,j} * t_j + e_i (mod q) 
+    for i in 0..total_rows_matrix_b {
+        let mut sum = 0;
+        for j in 0..total_cols_matrix_b {
+
+            let bij = input_matrix_b[i][j] as u128;
+            let ti = input_vector_t[j] as u128;
+            sum += (bij * ti) 
+        }
+
+        // Addition of e_i (mod q)
+        let temp = (sum as i128 + input_vector_e[i] as i128).rem_euclid(modulus as i128);
+        output_vector[i] = temp as u64;
+    }
+
+    output_vector
+
+}
+
+
+pub fn augment_matrices(
+    input_matrix_a: &[Vec<u64>],
+    input_matrix_b: &[Vec<u64>]
+) -> Vec<Vec<u64>> {
+    todo!()
+}
+
+
