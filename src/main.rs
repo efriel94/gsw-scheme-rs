@@ -9,14 +9,14 @@ fn main() {
     );
 
     let key_pair = GswKeyPair::generate_key_pair(&parameters);
-    let message = 0;
+    let bit_message = 1;
 
-    let ciphertext = encrypt_bit(parameters.clone(), key_pair.public_key, message);
+    let ciphertext = encrypt_bit(parameters.clone(), key_pair.public_key, bit_message);
     let decrypted_message = decrypt_bit(parameters, ciphertext, key_pair.secret_key);
 
-    println!("message: {}", message);
+    println!("message: {}", bit_message);
     println!("decrypted: {}", decrypted_message);
 
-    assert_eq!(message, decrypted_message);
+    assert_eq!(bit_message, decrypted_message);
 
 }

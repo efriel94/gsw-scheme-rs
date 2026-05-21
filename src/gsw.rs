@@ -73,37 +73,43 @@ pub struct GswKeyPair {
 
 impl GswKeyPair {
 
-    pub fn generate_key_pair(parameters: &GswParameters) -> Self {
+    pub fn generate_secret_key(
+        parameters: &GswParameters, 
+        private_random_eigenvector: &[u64]
+    ) -> GswSecretKey {
+
+        assert!(
+            private_random_eigenvector.is_empty() == false && private_random_eigenvector.len() == parameters.n,
+            "Incompatible private random eigenvector for secret key generation"
+        );
+
+        // eigenvector v in Z_q of size n + 1 where the first element is 1
+        // negate coefficents t_i, skipping the first coeff to be in the form: v <- (1, -t_1, .... -t_n)
+        // Negation over Z_q: -x = q - x (mod q)
+        let mut base_vector_v = vec![0; private_random_eigenvector.len() + 1];
+        base_vector_v[0] = 1;
+        for (i, &t_i) in private_random_eigenvector.iter().enumerate() {
+            base_vector_v[i+1] = if t_i == 0 { 0 } else { parameters.q - t_i }; 
+        }
+
+        // return the secret key with a Powersof2 representation
+        let sk_powers_of_two = powers_of_two_decomposition(parameters, &base_vector_v);
+
+        GswSecretKey { powers_of_two_secret_vector: (sk_powers_of_two) }
+    }
+
+    pub fn generate_key_pair(
+        parameters: &GswParameters
+    ) -> Self {
 
         let n = parameters.n;
         let q = parameters.q;
         let m = parameters.m;
         let bounded_error_distribution = parameters.B;
-
-        // ---------------------------------
-        // Generate Secret Key
-        // ---------------------------------
-
-        // cryptographic rng
         let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
 
-        // Sample a private random eigenvector t <- Z_q of size n
-        let mut private_random_eigenvector_t = vec![0; n];
-        for coeff in private_random_eigenvector_t.iter_mut() {
-            *coeff = sample_uniform_distribution_random_element_mod_q(&mut rng, &q);
-        }
-
-        // eigenvector v in Z_q of size n + 1 where the first element is 1
-        // negate coefficents t_i, skipping the first coeff to be in the form: v <- (1, -t_1, .... -t_n)
-        // Negation over Z_q: -x = q - x (mod q)
-        let mut base_vector_v = vec![0; private_random_eigenvector_t.len() + 1];
-        base_vector_v[0] = 1;
-        for (i, &t_i) in private_random_eigenvector_t.iter().enumerate() {
-            base_vector_v[i+1] = if t_i == 0 { 0 } else { q - t_i }; 
-        }
-
-        // return the secret key with a Powersof2 representation
-        let sk_powers_of_two = powers_of_two_decomposition(parameters, &base_vector_v);
+        let private_random_eigenvector_t = generate_private_eigenvector(&mut rng, parameters);
+        let secret_key = Self::generate_secret_key(parameters, &private_random_eigenvector_t);
 
         // ---------------------------------
         // Generate Public Key
@@ -141,12 +147,24 @@ impl GswKeyPair {
 
         GswKeyPair { 
             public_key: GswPublicKey { matrix_a: (public_augmented_matrix) }, 
-            secret_key: GswSecretKey { powers_of_two_secret_vector: (sk_powers_of_two) } 
+            secret_key,
         }
-
-
     }
 }
+
+// Generate private eigenvector
+fn generate_private_eigenvector(rng: &mut ChaCha20Rng, parameters: &GswParameters) -> Vec<u64> {
+
+    // Sample a private random eigenvector t <- Z_q of size n
+    let mut private_random_eigenvector_t = vec![0; parameters.n];
+    for coeff in private_random_eigenvector_t.iter_mut() {
+        *coeff = sample_uniform_distribution_random_element_mod_q(rng, &parameters.q);
+    }
+
+    private_random_eigenvector_t
+}
+
+//
 
 // GSW Encryption
 // Encrypt a message u \in Z_q 
