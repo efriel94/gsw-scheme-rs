@@ -164,8 +164,6 @@ fn generate_private_eigenvector(rng: &mut ChaCha20Rng, parameters: &GswParameter
     private_random_eigenvector_t
 }
 
-//
-
 // GSW Encryption
 // Encrypt a message u \in Z_q 
 // Outputs matrix C = Flatten(u * I_N + BitDecomp(R * A)) \in Zq of size N x N where N = k * l  
