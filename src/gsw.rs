@@ -98,6 +98,13 @@ impl GswKeyPair {
         GswSecretKey { powers_of_two_secret_vector: (sk_powers_of_two) }
     }
 
+    pub fn generate_public_key(
+        parameters: &GswParameters,
+        private_random_eigenvector: &[u64]
+    ) -> GswPublicKey {
+        todo!()
+    }
+
     pub fn generate_key_pair(
         parameters: &GswParameters
     ) -> Self {
