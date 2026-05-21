@@ -51,7 +51,7 @@ pub struct GswSecretKey {
 }
 
 
-#[derive()]
+
 pub struct GswKeyPair {
     pub public_key: GswPublicKey,
     pub secret_key: GswSecretKey,
@@ -108,7 +108,7 @@ impl GswKeyPair {
         let error_eigenvector = sample_error_eigenvector(&mut rng, bounded_error_distribution, m);
 
         // Compute eigenvector b = (B*t + e) mod q 
-        let mut body_eigenvector = body(
+        let body_eigenvector = body(
             &matrix_b, 
             &private_random_eigenvector_t, 
             &error_eigenvector, 
@@ -116,30 +116,16 @@ impl GswKeyPair {
         );
 
         // Generate matrix A = [b | B]
-        let public_augmented_matrix = augment_matrix
-
-
-        // the public augmented matrix A = [b | B]
-        // where b \in Z_q of size m x 1
-        // where B \in Z_q of size m x n
-        // therefore output public key A \in Z_q of size m * (n + 1)
-        let mut matrix_a = vec![vec![0u64; n + 1]; m];
-        for i in 0..m {
-
-            //first column of b_i
-            let b_i = b_eigenvector[i];
-            matrix_a[i][0] = b_i;
-
-            for j in 0..n {
-
-                // augmented with elements of B_i
-                matrix_a[i][j + 1] = matrix_b[i][j + 1];
-            }
-        }
+        // where b \in Z_q , B \in Z_q of size m x n
+        // Resultant A matrix \in Z_q of size m x (n + 1)
+        let public_augmented_matrix = augment_matrices(
+            &body_eigenvector,
+            &matrix_b
+        );
         
 
         GswKeyPair { 
-            public_key: GswPublicKey { data: (matrix_a) }, 
+            public_key: GswPublicKey { data: (public_augmented_matrix) }, 
             secret_key: GswSecretKey { data: (sk_powers_of_two) } 
         }
 
@@ -152,7 +138,7 @@ impl GswKeyPair {
 // Outputs matrix C = Flatten(u * I_N + BitDecomp(R * A)) \in Zq of size N x N where N = k * l  
 fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswCiphertext {
 
-    let N = (parameters.n + 1) * parameters.l;
+    let N = parameters.large_n;
     let n = parameters.n;
     let m = parameters.m;
     let q = parameters.q;
@@ -161,7 +147,7 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
     // u * I_N where u \in {0,1} and I_N is the identity matrix of size N x N
     // (u * I_N) \in {0,1} of size N x N
     let identity_matrix = identity_matrix(&parameters);
-    let mut u_times_identity_matrix: Vec<Vec<u64>> = identity_matrix
+    let u_times_identity_matrix: Vec<Vec<u64>> = identity_matrix
         .iter()
         .map(|row| {
             row.iter()
@@ -169,11 +155,10 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
                 .collect::<Vec<u64>>()
         })
         .collect::<Vec<Vec<u64>>>();
-
-    //BitDecomp(R * A) where R \times A is statistically uniform by the leftover hash lemma
     
     //generate a random N x m matrix R with 0/1 entries
     let mut rng = rand::rng();
+
     let mut random_binary_matrix_r = vec![vec![0u64; m]; N];
     for i in 0..N {
         for j in 0..m {
@@ -181,53 +166,42 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
         }
     }
 
-    let r_times_a_matrix = schoolbook_matrix_multiplication_mod_q(
+    // R * A where R <- {0,1} of size N x m and A 
+    let r_times_a_matrix = schoolbook_lwe_matrix_multiplication_mod_q(
         random_binary_matrix_r,
         matrix_a,
-        q, 
-        );
-
-
-    // N x m matrix R \times public matrix A of size m * (n + 1)
-    // (R * A) \in Z_q of size N x (n + 1)
-    let r_times_a_matrix_len = N * (n + 1);
-    let r_times_a_matrix = vec![vec![0u64; n + 1]; N];
-
-    for i in 0..N {
-        for j in 0..n {
-            let mut sum = 0;
-
-            for k in 0..m {
-                // row - col mult
-                let rij = random_binary_matrix_r[i * m + k] as u128;
-                let aij = matrix_a[k * n + j] as u128;
-                let mult_result = rij * aij;
-
-                sum += mult_result;
-            }
-
-            //reduce mod q and assign
-            r_times_a_matrix[i * N + j] = (sum % (q as u128)) as u64;
-        }
-    }
+        q.into(), 
+    );
 
     // BitDecomp(R * A), returns a matrix of size N x (n + 1) * l since it expands each row element into \elle bits
-    // By def (n + 1) * l = N, so the output matrix is N * N
+    // By def (n + 1) * l = N, so the output matrix is of size N * N 
+    //R \times A is statistically uniform by the leftover hash lemma
     let bit_decomp_r_times_a_matrix = bit_decomposition(&parameters, &r_times_a_matrix);
 
     // Addition of (u * I_N) + BitDecomp(R * A)
-    let addition_vector_temp: Vec<u64> = u_times_identity_matrix
+    // where (u * I_N) \in Z_q of size N x N and BitDecomp(R*A) \in {0,1} of size N * N
+    // Simply atddition mod q of two NxN marices
+    let addition_vector_temp: Vec<Vec<u64>> = u_times_identity_matrix
         .iter()
-        .zip(bit_decomp_r_times_a_matrix.iter())
-        .map(|(a,b)| (a + b) % q)
+        .zip(bit_decomp_r_times_a_matrix.chunks(N))
+        .map(|(row_a, row_b) | {
+            row_a
+                .iter()
+                .zip(row_b.iter())
+                .map(|(&a,&b)| (a + b) % q)
+                .collect::<Vec<u64>>()  
+        })
         .collect();
 
     // C = Flatten((u * I_N) + BitDecomp(R * A))
     let flattened_ciphertext = flatten(&parameters, &addition_vector_temp);
     assert_eq!(
         flattened_ciphertext.len(), 
-        N * N,
-        "Incorrect len: got {}, expected {}", flattened_ciphertext.len(), N * N);
+        N,
+        "Incorrect row count: got {}, expected {}", flattened_ciphertext.len(), N);
+    assert!(
+        flattened_ciphertext.iter().all(|row| row.len() == N),
+        "Incorrect column count: expected every row to have len {}", N);
 
     GswCiphertext { ciphertext: (flattened_ciphertext) }
 
@@ -243,27 +217,28 @@ fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) ->
 // Output: Bit decomposed representation (a_{1,0}, ... , a_{1, l-1}, ... , a_{k,0} , .... , a_{k, l-1}) ,
 // where l = floor(log) + 1
 // Ordered from LSB to MSB
-fn bit_decomposition(parameters: &GswParameters, input_eigenvector: &Vec<u64>) -> Vec<u64> {
+fn bit_decomposition(parameters: &GswParameters, input_eigenvector: &[Vec<u64>]) -> Vec<u64> {
 
     // for every element in the vector we break each one into l (\elle) bits
-    let output_len = input_eigenvector.len() * parameters.l;
+    let output_len = input_eigenvector.iter().map(|row| row.len()).sum::<usize>() * parameters.l;
     let mut output_vec = Vec::with_capacity(output_len);
 
-    for &ai in input_eigenvector.iter().as_ref() {
-        for j in 0..parameters.l {
-            output_vec.push((ai >> j) & 1);    
+    for row in input_eigenvector.iter() {
+        for &ai in row.iter() {
+            for j in 0..parameters.l {
+                output_vec.push((ai >> j) & 1);    
+            }
         }
     }
 
     output_vec
-
 
 }
 
 // BitDecomp^{-1}(a)
 // Input: Eigenvector a with coefficents a_i over Z_q
 // Output: Inverse bit decomposition representation (\sum(2^j * a_{1,j} , ... , \sum(2^j * a_{k,j}))
-fn inverse_bit_decomposition(parameters: &GswParameters, input_eigenvector: &Vec<u64>) -> Vec<u64> {
+fn inverse_bit_decomposition(parameters: &GswParameters, input_eigenvector: &[u64]) -> Vec<u64> {
     
     let k = input_eigenvector.len() / parameters.l;
     let bit_level = parameters.l;
@@ -287,15 +262,26 @@ fn inverse_bit_decomposition(parameters: &GswParameters, input_eigenvector: &Vec
 
 }
 
-// Flatten(a) = BitDecomp(InverseBitDecomp(a)) \in {0,1} of size N
-// Input: Eigenvector a with coefficents over Z_q
-// Output: N-dimensional Eigenvector with coefficents that are strongly bounded, a requirement to mitigate multiplicative noise
-fn flatten(parameters: &GswParameters, input_eigenvector: &Vec<u64>) -> Vec<u64> {
+// Flatten(A) = BitDecomp(InverseBitDecomp(A)) \in {0,1}^{N x N}
+// Input: Matrix A with rows that are bit-decomposition-width vectors over Z_q
+// Output: N x N matrix with coefficents that are strongly bounded, a requirement to mitigate multiplicative noise
+fn flatten(
+    parameters: &GswParameters, 
+    input_matrix: &[Vec<u64>]
+) -> Vec<Vec<u64>> {
 
-    let inverse_bit_decomp_vector_result = inverse_bit_decomposition(parameters, input_eigenvector);
-    let bit_decomp_vector_result = bit_decomposition(parameters, &inverse_bit_decomp_vector_result);
+    let expected_row_len = parameters.large_n;
+    assert!(
+        input_matrix.iter().all(|row| row.len() == expected_row_len),
+        "Flatten expects each input row to have len {}", expected_row_len);
 
-    bit_decomp_vector_result
+    input_matrix
+        .iter()
+        .map(|row| {
+            let inverse_bit_decomp_row_result = inverse_bit_decomposition(parameters, row);
+            bit_decomposition(parameters, &[inverse_bit_decomp_row_result])
+        })
+        .collect()
 }
 
 // Powersof2(a)
@@ -308,7 +294,7 @@ fn powers_of_two_decomposition(parameters: &GswParameters, input_eigenvector: &[
     let k = input_eigenvector.len(); 
     let q = parameters.q;
 
-    let mut output_vec: Vec<u64> = Vec::with_capacity((k * l));
+    let mut output_vec: Vec<u64> = Vec::with_capacity(k * l);
 
     // so we want to loop over the current input vector
     // multiply each element by a power of two
@@ -326,18 +312,16 @@ fn powers_of_two_decomposition(parameters: &GswParameters, input_eigenvector: &[
     
 }
 
-// Generate an identity square matrix of size m x n
+// Generate an identity square matrix of size N x N
 fn identity_matrix(parameters: &GswParameters) -> Vec<Vec<u64>> {
 
-    let m = parameters.m;
-    assert!(m > 0);
+    let large_n = parameters.large_n;
+    assert!(large_n > 0);
     
-    let mut output_vec = vec![vec![0u64; m]; m];
-    for i in 0..m {
+    let mut output_vec = vec![vec![0u64; large_n]; large_n];
+    for i in 0..large_n {
         output_vec[i][i] = 1;
     }
 
     output_vec
 }
-
-

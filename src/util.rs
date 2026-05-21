@@ -81,7 +81,7 @@ pub fn matrix_vector_multiplication_mod_q(
 }
 
 
-pub fn schoolbook_matrix_multiplication_mod_q(
+pub fn schoolbook_lwe_matrix_multiplication_mod_q(
     input_matrix_a: Vec<Vec<u64>>, 
     input_matrix_b: Vec<Vec<u64>>, 
     modulus: u128
@@ -94,9 +94,9 @@ pub fn schoolbook_matrix_multiplication_mod_q(
 
     assert!(rows_a > 0 && cols_a > 0, "input matrix a must be non empty");
     assert!(rows_b > 0 && cols_b > 0, "input matrix b must be non empty");
-    assert!(rows_a == cols_b, "matrix dimensions do not align for matrix multiplication");
+    assert!(cols_a == rows_b, "matrix dimensions do not align for matrix multiplication");
 
-    let mut output_vec: Vec<Vec<u64>> = Vec::with_capacity(rows_a * cols_b);
+    let mut output_vec = vec![vec![0u64; cols_b]; rows_a];
 
     for i in 0..rows_a {
         for j in 0..cols_b {
@@ -161,10 +161,24 @@ pub fn body(
 
 
 pub fn augment_matrices(
-    input_matrix_a: &[Vec<u64>],
+    input_vector_a: &[u64],
     input_matrix_b: &[Vec<u64>]
 ) -> Vec<Vec<u64>> {
-    todo!()
+
+    assert!(
+        input_vector_a.len() == input_matrix_b.len(),
+        "Length of input vector must have the same number of rows as input matrix"
+    );
+
+    let mut output_vec = Vec::with_capacity(input_matrix_b.len());
+    
+    for (&ai, row_b) in input_vector_a.iter().zip(input_matrix_b.iter())  {
+        
+        let mut new_row_vec = Vec::with_capacity(row_b.len() + 1);
+        new_row_vec.push(ai);
+        new_row_vec.extend(row_b.iter());
+        output_vec.push(new_row_vec);
+    }
+
+    output_vec
 }
-
-
