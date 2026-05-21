@@ -1,19 +1,20 @@
 use std::vec;
 
 use rand::{Rng, RngExt};
+use rand_chacha::ChaCha20Rng;
 use rand_distr::{Normal,Distribution};
 
 //  Sample an element distribution over the range (0, q-1)
-pub fn sample_uniform_distribution_random_element_mod_q<R: Rng>(rng: &mut R, q: &u64) -> u64 {
+pub fn sample_uniform_distribution_random_element_mod_q(rng: &mut ChaCha20Rng, q: &u64) -> u64 {
     rng.random_range(0..*q)   
 }
 
 // Sample an element from the normal distribution N(0, sigma^2)
-pub fn sample_normal_distribution_random_element(sigma: f64) -> f64 {
+pub fn sample_normal_distribution_random_element(rng: &mut ChaCha20Rng, sigma: f64) -> f64 {
 
     //mean zero, std deviation sigma
     let normal = Normal::new(0.0, sigma).unwrap();
-    let rand_element = normal.sample(&mut rand::rng()).round();
+    let rand_element = normal.sample(rng).round();
     rand_element
 }
 

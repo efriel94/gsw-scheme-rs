@@ -1,4 +1,6 @@
 use rand::RngExt;
+use faer::prelude::*;
+use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
 use crate::util::*;
 
 // Setup 
@@ -82,8 +84,10 @@ impl GswKeyPair {
         // Generate Secret Key
         // ---------------------------------
 
+        // cryptographic rng
+        let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
+
         // Sample a private random eigenvector t <- Z_q of size n
-        let mut rng = rand::rng();
         let mut private_random_eigenvector_t = vec![0; n];
         for coeff in private_random_eigenvector_t.iter_mut() {
             *coeff = sample_uniform_distribution_random_element_mod_q(&mut rng, &q);
@@ -106,7 +110,6 @@ impl GswKeyPair {
         // ---------------------------------
 
         // Generate a random matrix B sampled over Z_q of size m x n
-        let mut rng = rand::rng();
         let mut matrix_b = vec![vec![0u64; n]; m];
         for i in 0..m {
             for j in 0..n {
@@ -170,7 +173,7 @@ pub fn encrypt_bit(parameters: GswParameters, pk: GswPublicKey, message: u8) -> 
         .collect::<Vec<Vec<u64>>>();
     
     //generate a random N x m matrix R with 0/1 entries
-    let mut rng = rand::rng();
+    let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
 
     let mut random_binary_matrix_r = vec![vec![0u64; m]; N];
     for i in 0..N {
