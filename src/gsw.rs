@@ -39,16 +39,16 @@ impl GswParameters {
 
 // NxN Ciphertext with coefficents over Z_q
 struct GswCiphertext {
-    ciphertext: Vec<Vec<u64>>
+    ciphertext: Vec<Vec<u64>>,
+    ciphertext_modulus: u128
 }
 
 pub struct GswPublicKey {
-    data: Vec<Vec<u64>>,
-    
+    matrix_a : Vec<Vec<u64>>,  
 }
 
 pub struct GswSecretKey {
-    data: Vec<u64>,
+    powers_of_two_secret_vector: Vec<u64>,
 }
 
 
@@ -126,8 +126,8 @@ impl GswKeyPair {
         
 
         GswKeyPair { 
-            public_key: GswPublicKey { data: (public_augmented_matrix) }, 
-            secret_key: GswSecretKey { data: (sk_powers_of_two) } 
+            public_key: GswPublicKey { matrix_a: (public_augmented_matrix) }, 
+            secret_key: GswSecretKey { powers_of_two_secret_vector: (sk_powers_of_two) } 
         }
 
 
@@ -143,7 +143,7 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
     let n = parameters.n;
     let m = parameters.m;
     let q = parameters.q;
-    let matrix_a = pk.data;
+    let matrix_a = pk.matrix_a;
 
     // u * I_N where u \in {0,1} and I_N is the identity matrix of size N x N
     // (u * I_N) \in {0,1} of size N x N
@@ -204,7 +204,10 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
         flattened_ciphertext.iter().all(|row| row.len() == N),
         "Incorrect column count: expected every row to have len {}", N);
 
-    GswCiphertext { ciphertext: (flattened_ciphertext) }
+    GswCiphertext { 
+        ciphertext: (flattened_ciphertext),
+        ciphertext_modulus: (q as u128),
+     }
 
 }
 
@@ -216,22 +219,22 @@ fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) ->
 
     assert_eq!(ct.ciphertext.len(), large_n);
     assert!(ct.ciphertext.iter().all(|row| row.len() == large_n));
-    assert_eq!(sk.data.len(), large_n);
+    assert_eq!(sk.powers_of_two_secret_vector.len(), large_n);
 
     // sk.data must be v = PowersOf2(s), not raw s.
     let decryption_index = (0..ell)
         .find(|&i| {
-            let vi = sk.data[i];
+            let vi = sk.powers_of_two_secret_vector[i];
             vi > q / 4 && vi <= q / 2
         })
         .expect("No v_i found in (q/4, q/2]");
 
-    let vi = sk.data[decryption_index];
+    let vi = sk.powers_of_two_secret_vector[decryption_index];
 
     // x_i = <C_i, v> mod q
     let xi = ct.ciphertext[decryption_index]
         .iter()
-        .zip(sk.data.iter())
+        .zip(sk.powers_of_two_secret_vector.iter())
         .fold(0u128, |acc, (&cij, &vj)| {
             (acc + (cij as u128 * vj as u128)) % q as u128
         });
