@@ -44,6 +44,7 @@ struct GswCiphertext {
 
 pub struct GswPublicKey {
     data: Vec<Vec<u64>>,
+    
 }
 
 pub struct GswSecretKey {
@@ -209,7 +210,34 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
 
 // GSW Decryption
 fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) -> u64 {
-    todo!()
+    let large_n = parameters.large_n;
+    let q = parameters.q;
+    let ell = parameters.l;
+
+    assert_eq!(ct.ciphertext.len(), large_n);
+    assert!(ct.ciphertext.iter().all(|row| row.len() == large_n));
+    assert_eq!(sk.data.len(), large_n);
+
+    // sk.data must be v = PowersOf2(s), not raw s.
+    let decryption_index = (0..ell)
+        .find(|&i| {
+            let vi = sk.data[i];
+            vi > q / 4 && vi <= q / 2
+        })
+        .expect("No v_i found in (q/4, q/2]");
+
+    let vi = sk.data[decryption_index];
+
+    // x_i = <C_i, v> mod q
+    let xi = ct.ciphertext[decryption_index]
+        .iter()
+        .zip(sk.data.iter())
+        .fold(0u128, |acc, (&cij, &vj)| {
+            (acc + (cij as u128 * vj as u128)) % q as u128
+        });
+
+    // µ' = round(x_i / v_i)
+    ((xi + vi as u128 / 2) / vi as u128) as u64
 }
 
 // BitDecomp(a)
