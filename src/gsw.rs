@@ -1,10 +1,8 @@
-use std::{process::id, vec};
-
-use rand::{Rng, RngExt};
+use rand::RngExt;
 use crate::util::*;
 
 // Setup 
-#[derive()]
+#[derive(Clone)]
 pub struct GswParameters {
     pub n: usize,        // lwe lattice dimension  
     pub q: u64,          // ciphertext modulus
@@ -15,6 +13,19 @@ pub struct GswParameters {
 }
 
 impl GswParameters {
+    pub fn new(n: usize, q: u64, b: i64, m: usize) -> Self {
+        let mut params = GswParameters {
+            n,
+            q,
+            B: b,
+            m,
+            l: 0,
+            large_n: 0,
+        };
+        params.compute_params();
+        params
+    }
+
     fn compute_params(&mut self) {
         let l = ((self.q as f64).log2().floor() + 1.0) as usize;
         let large_n = (self.n + 1) * l;
@@ -38,7 +49,7 @@ impl GswParameters {
 }
 
 // NxN Ciphertext with coefficents over Z_q
-struct GswCiphertext {
+pub struct GswCiphertext {
     ciphertext: Vec<Vec<u64>>,
     ciphertext_modulus: u128
 }
@@ -137,10 +148,9 @@ impl GswKeyPair {
 // GSW Encryption
 // Encrypt a message u \in Z_q 
 // Outputs matrix C = Flatten(u * I_N + BitDecomp(R * A)) \in Zq of size N x N where N = k * l  
-fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswCiphertext {
+pub fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswCiphertext {
 
     let N = parameters.large_n;
-    let n = parameters.n;
     let m = parameters.m;
     let q = parameters.q;
     let matrix_a = pk.matrix_a;
@@ -212,7 +222,7 @@ fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswC
 }
 
 // GSW Decryption
-fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) -> u64 {
+pub fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) -> u64 {
     let large_n = parameters.large_n;
     let q = parameters.q;
     let ell = parameters.l;
