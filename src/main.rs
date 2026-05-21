@@ -11,8 +11,8 @@ fn main() {
     let key_pair = GswKeyPair::generate_key_pair(&parameters);
     let bit_message = 1;
 
-    let ciphertext = encrypt_bit(parameters.clone(), key_pair.public_key, bit_message);
-    let decrypted_message = decrypt_bit(parameters, ciphertext, key_pair.secret_key);
+    let ciphertext = encrypt_bit(&parameters, &key_pair.public_key, bit_message);
+    let decrypted_message = decrypt_bit(&parameters, ciphertext, &key_pair.secret_key);
 
     println!("message: {}", bit_message);
     println!("decrypted: {}", decrypted_message);

@@ -169,14 +169,14 @@ fn generate_private_eigenvector(rng: &mut ChaCha20Rng, parameters: &GswParameter
 // GSW Encryption
 // Encrypt a message u \in Z_q 
 // Outputs matrix C = Flatten(u * I_N + BitDecomp(R * A)) \in Zq of size N x N where N = k * l  
-pub fn encrypt_bit(parameters: GswParameters, pk: GswPublicKey, message: u8) -> GswCiphertext {
+pub fn encrypt_bit(parameters: &GswParameters, pk: &GswPublicKey, message: u8) -> GswCiphertext {
 
     assert!(message <= 1, "Only supports the encryption of 1-bit messages");
 
     let N = parameters.large_n;
     let m = parameters.m;
     let q = parameters.q;
-    let matrix_a = pk.matrix_a;
+    let matrix_a = pk.matrix_a.to_owned();
 
     // u * I_N where u \in {0,1} and I_N is the identity matrix of size N x N
     // (u * I_N) \in {0,1} of size N x N
@@ -245,7 +245,7 @@ pub fn encrypt_bit(parameters: GswParameters, pk: GswPublicKey, message: u8) -> 
 }
 
 // GSW Decryption
-pub fn decrypt_bit(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) -> u8 {
+pub fn decrypt_bit(parameters: &GswParameters, ct: GswCiphertext, sk: &GswSecretKey) -> u8 {
     let large_n = parameters.large_n;
     let q = parameters.q;
     let ell = parameters.l;
@@ -254,7 +254,7 @@ pub fn decrypt_bit(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKe
     assert!(ct.ciphertext.iter().all(|row| row.len() == large_n));
     assert_eq!(sk.powers_of_two_secret_vector.len(), large_n);
 
-    // sk.data must be v = PowersOf2(s), not raw s.
+    // Find vi such that vi \in (q/4, q/2]) 
     let decryption_index = (0..ell)
         .find(|&i| {
             let vi = sk.powers_of_two_secret_vector[i];
@@ -272,8 +272,13 @@ pub fn decrypt_bit(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKe
             (acc + (cij as u128 * vj as u128)) % q as u128
         });
 
-    // µ' = round(x_i / v_i)
-    ((xi + vi as u128 / 2) / vi as u128) as u8
+    // Essentially if <C_i, v> is closer to v_i then return 1, otherwise return 0
+    let xi = xi as u64;
+    let distance_to_zero = xi.min(q - xi);
+    let difference_to_one = xi.abs_diff(vi);
+    let distance_to_one = difference_to_one.min(q - difference_to_one);
+
+    if distance_to_one < distance_to_zero { 1 } else { 0 }
 }
 
 // BitDecomp(a)
