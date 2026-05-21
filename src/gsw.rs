@@ -148,7 +148,9 @@ impl GswKeyPair {
 // GSW Encryption
 // Encrypt a message u \in Z_q 
 // Outputs matrix C = Flatten(u * I_N + BitDecomp(R * A)) \in Zq of size N x N where N = k * l  
-pub fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> GswCiphertext {
+pub fn encrypt_bit(parameters: GswParameters, pk: GswPublicKey, message: u8) -> GswCiphertext {
+
+    assert!(message <= 1, "Only supports the encryption of 1-bit messages");
 
     let N = parameters.large_n;
     let m = parameters.m;
@@ -162,7 +164,7 @@ pub fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> 
         .iter()
         .map(|row| {
             row.iter()
-                .map(|&x| x * message)
+                .map(|&x| x * message as u64)
                 .collect::<Vec<u64>>()
         })
         .collect::<Vec<Vec<u64>>>();
@@ -222,7 +224,7 @@ pub fn encryption(parameters: GswParameters, pk: GswPublicKey, message: u64) -> 
 }
 
 // GSW Decryption
-pub fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) -> u64 {
+pub fn decrypt_bit(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey) -> u8 {
     let large_n = parameters.large_n;
     let q = parameters.q;
     let ell = parameters.l;
@@ -250,7 +252,7 @@ pub fn decryption(parameters: GswParameters, ct: GswCiphertext, sk: GswSecretKey
         });
 
     // µ' = round(x_i / v_i)
-    ((xi + vi as u128 / 2) / vi as u128) as u64
+    ((xi + vi as u128 / 2) / vi as u128) as u8
 }
 
 // BitDecomp(a)

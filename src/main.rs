@@ -1,4 +1,4 @@
-use gsw_scheme::gsw::{decryption, encryption, GswKeyPair, GswParameters};
+use gsw_scheme::gsw::{decrypt_bit, encrypt_bit, GswKeyPair, GswParameters};
 
 fn main() {
     let parameters = GswParameters::new(
@@ -9,10 +9,10 @@ fn main() {
     );
 
     let key_pair = GswKeyPair::generate_key_pair(&parameters);
-    let message = 1;
+    let message = 0;
 
-    let ciphertext = encryption(parameters.clone(), key_pair.public_key, message);
-    let decrypted_message = decryption(parameters, ciphertext, key_pair.secret_key);
+    let ciphertext = encrypt_bit(parameters.clone(), key_pair.public_key, message);
+    let decrypted_message = decrypt_bit(parameters, ciphertext, key_pair.secret_key);
 
     println!("message: {}", message);
     println!("decrypted: {}", decrypted_message);
