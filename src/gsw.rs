@@ -99,46 +99,33 @@ impl GswKeyPair {
     }
 
     pub fn generate_public_key(
+        rng: &mut ChaCha20Rng,
         parameters: &GswParameters,
         private_random_eigenvector: &[u64]
     ) -> GswPublicKey {
-        todo!()
-    }
-
-    pub fn generate_key_pair(
-        parameters: &GswParameters
-    ) -> Self {
 
         let n = parameters.n;
-        let q = parameters.q;
         let m = parameters.m;
-        let bounded_error_distribution = parameters.B;
-        let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
-
-        let private_random_eigenvector_t = generate_private_eigenvector(&mut rng, parameters);
-        let secret_key = Self::generate_secret_key(parameters, &private_random_eigenvector_t);
-
-        // ---------------------------------
-        // Generate Public Key
-        // ---------------------------------
+        let q = parameters.q;
+        let error_bound = parameters.B;
 
         // Generate a random matrix B sampled over Z_q of size m x n
         let mut matrix_b = vec![vec![0u64; n]; m];
         for i in 0..m {
             for j in 0..n {
-                matrix_b[i][j] = sample_uniform_distribution_random_element_mod_q(&mut rng, &q);
+                matrix_b[i][j] = sample_uniform_distribution_random_element_mod_q(rng, &parameters.q);
             }
         }
         
         // Generate a random error eignevector vector e over X^m where X^m is B-bounded between [-B, B] 
         // Sampled from the distribution of Chi of size m
         // therefore e <- X^m where e_i \in [-B, B]
-        let error_eigenvector = sample_error_eigenvector(&mut rng, bounded_error_distribution, m);
+        let error_eigenvector = sample_error_eigenvector(rng, error_bound, m);
 
         // Compute eigenvector b = (B*t + e) mod q 
         let body_eigenvector = body(
             &matrix_b, 
-            &private_random_eigenvector_t, 
+            &private_random_eigenvector, 
             &error_eigenvector, 
             q as u128,
         );
@@ -150,10 +137,26 @@ impl GswKeyPair {
             &body_eigenvector,
             &matrix_b
         );
-        
+
+        GswPublicKey { 
+            matrix_a: (public_augmented_matrix) 
+        }
+
+
+    }
+
+    pub fn generate_key_pair(
+        parameters: &GswParameters
+    ) -> Self {
+
+        let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
+
+        let private_random_eigenvector_t = generate_private_eigenvector(&mut rng, parameters);
+        let secret_key = Self::generate_secret_key(parameters, &private_random_eigenvector_t);
+        let public_key = Self::generate_public_key(&mut rng, &parameters, &private_random_eigenvector_t);
 
         GswKeyPair { 
-            public_key: GswPublicKey { matrix_a: (public_augmented_matrix) }, 
+            public_key, 
             secret_key,
         }
     }
