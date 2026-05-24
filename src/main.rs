@@ -1,11 +1,11 @@
-use gsw_scheme::gsw::{decrypt_bit, encrypt_bit, GswKeyPair, GswParameters};
+use gsw_scheme::gsw::{GswKeyPair, GswParameters, decrypt_bit, encrypt_bit};
 
 fn main() {
     let parameters = GswParameters::new(
-        4,    // n
-        1024, // q
-        1,    // B
-        64,   // m
+        4,    // lwe_dimension
+        1024, // ciphertext_modulus
+        1,    // error_bound
+        64,   // public_key_samples
     );
 
     let key_pair = GswKeyPair::generate_key_pair(&parameters);
@@ -18,5 +18,4 @@ fn main() {
     println!("decrypted: {}", decrypted_message);
 
     assert_eq!(bit_message, decrypted_message);
-
 }
