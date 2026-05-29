@@ -1,11 +1,11 @@
-use gsw_scheme::gsw::{GswKeyPair, GswParameters, decrypt_bit, encrypt_bit};
+use gsw_scheme::constructions::gsw::{GswKeyPair, GswParameters, decrypt_bit, encrypt_bit};
 
 fn main() {
     let parameters = GswParameters::new(
-        4,    // lwe_dimension
-        1024, // ciphertext_modulus
-        1,    // error_bound
-        64,   // public_key_samples
+        4,          // lwe_dimension
+        1024,  // ciphertext_modulus
+        1,            // error_bound
+        64,    // public_key_samples
     );
 
     let key_pair = GswKeyPair::generate_key_pair(&parameters);
