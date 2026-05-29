@@ -15,7 +15,7 @@ pub struct GswParameters {
     /// Error bound `B`, each sampled error coefficient lies in `[-B, B]`.
     pub error_bound: i64,
 
-    /// Number of public-key LWE samples `m`, matrix `A` has `m` rows.
+    /// Number of samples `m`, matrix `A` has `m` rows.
     pub public_key_samples: usize,
 
     /// Bit-decomposition length `l = floor(log2(q)) + 1`.
