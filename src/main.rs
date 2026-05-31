@@ -1,4 +1,4 @@
-use gsw_scheme::constructions::gsw::{GswKeyPair, GswParameters, decrypt_bit, encrypt_bit};
+use gsw_scheme::constructions::gsw::{GswInstance, GswParameters, decrypt_bit, encrypt_bit};
 
 fn main() {
     let parameters = GswParameters::new(
@@ -8,11 +8,11 @@ fn main() {
         64,    // public_key_samples
     );
 
-    let key_pair = GswKeyPair::generate_key_pair(&parameters);
+    let gsw_instance = GswInstance::generate(&parameters); // returns c = [b | B] where b is the private component augmented with the public B matrix
     let bit_message = 1;
 
-    let ciphertext = encrypt_bit(&parameters, &key_pair.public_key, bit_message);
-    let decrypted_message = decrypt_bit(&parameters, ciphertext, &key_pair.secret_key);
+    let ciphertext = encrypt_bit(&parameters, &gsw_instance.public_component, bit_message);
+    let decrypted_message = decrypt_bit(&parameters, ciphertext, &gsw_instance.private_component);
 
     println!("message: {}", bit_message);
     println!("decrypted: {}", decrypted_message);

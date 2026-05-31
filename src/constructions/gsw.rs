@@ -16,7 +16,7 @@ pub struct GswParameters {
     pub error_bound: i64,
 
     /// Number of samples `m`, matrix `A` has `m` rows.
-    pub public_key_samples: usize,
+    pub sample_size: usize,
 
     /// Bit-decomposition length `l = floor(log2(q)) + 1`.
     decomposition_length: usize,
@@ -43,13 +43,13 @@ impl GswParameters {
         lwe_dimension: usize,
         ciphertext_modulus: u64,
         error_bound: i64,
-        public_key_samples: usize,
+        sample_size: usize,
     ) -> Self {
         let mut params = GswParameters {
             lwe_dimension,
             ciphertext_modulus,
             error_bound,
-            public_key_samples,
+            sample_size,
             decomposition_length: 0,
             ciphertext_dimension: 0,
         };
@@ -75,7 +75,7 @@ impl GswParameters {
             lwe_dimension: self.lwe_dimension,
             ciphertext_modulus: self.ciphertext_modulus,
             error_bound: self.error_bound,
-            public_key_samples: self.public_key_samples,
+            sample_size: self.sample_size,
             decomposition_length: 0,
             ciphertext_dimension: 0,
         };
@@ -90,20 +90,30 @@ pub struct GswCiphertext {
     ciphertext_modulus: u128,
 }
 
-pub struct GswPublicKey {
+pub struct GswPublicComponent {
     matrix_a: Vec<Vec<u64>>,
 }
 
-pub struct GswSecretKey {
+pub struct GswPrivateComponent {
     powers_of_two_secret_vector: Vec<u64>,
 }
 
-pub struct GswKeyPair {
-    pub public_key: GswPublicKey,
-    pub secret_key: GswSecretKey,
+/// A private GSW instance.
+///
+/// Contains both the public LWE-style matrix:
+///
+///     A = [b | B]
+///
+/// and the corresponding secret key material.
+///
+/// This implementation is intended for experimentation and does not
+/// currently model a separate public-key encryption interface.
+pub struct GswInstance {
+    pub public_component: GswPublicComponent,
+    pub private_component: GswPrivateComponent,
 }
 
-impl GswKeyPair {
+impl GswInstance {
     /// Derives the secret-key representation from a previously sampled vector `t`.
     ///
     /// This implements the key-derivation portion of `SecretKeyGen`. The caller
@@ -122,10 +132,10 @@ impl GswKeyPair {
     /// # Panics
     ///
     /// Panics if `private_random_eigenvector` is empty or does not have length `n`.
-    pub fn generate_secret_key(
+    pub fn generate_private_component(
         parameters: &GswParameters,
         private_random_eigenvector: &[u64],
-    ) -> GswSecretKey {
+    ) -> GswPrivateComponent {
         assert!(
             !private_random_eigenvector.is_empty()
                 && private_random_eigenvector.len() == parameters.lwe_dimension,
@@ -148,7 +158,7 @@ impl GswKeyPair {
         // return the secret key with a Powersof2 representation
         let sk_powers_of_two = powers_of_two_decomposition(parameters, &base_vector_s);
 
-        GswSecretKey {
+        GswPrivateComponent {
             powers_of_two_secret_vector: (sk_powers_of_two),
         }
     }
@@ -167,19 +177,19 @@ impl GswKeyPair {
     /// # Output
     ///
     /// Returns the GSW public-key matrix `A in Z_q^(m x (n + 1))`.
-    pub fn generate_public_key(
+    pub fn generate_public_component(
         rng: &mut ChaCha20Rng,
         parameters: &GswParameters,
         private_random_eigenvector: &[u64],
-    ) -> GswPublicKey {
+    ) -> GswPublicComponent {
         let lwe_dimension = parameters.lwe_dimension;
-        let public_key_samples = parameters.public_key_samples;
+        let sample_size = parameters.sample_size;
         let ciphertext_modulus = parameters.ciphertext_modulus;
         let error_bound = parameters.error_bound;
 
         // Generate a random matrix B sampled over Z_q of size m x n
-        let mut matrix_b = vec![vec![0u64; lwe_dimension]; public_key_samples];
-        for i in 0..public_key_samples {
+        let mut matrix_b = vec![vec![0u64; lwe_dimension]; sample_size];
+        for i in 0..sample_size {
             for j in 0..lwe_dimension {
                 matrix_b[i][j] = sample_uniform_distribution_random_element_mod_q(
                     rng,
@@ -191,7 +201,7 @@ impl GswKeyPair {
         // Generate a random error eignevector vector e over X^m where X^m is B-bounded between [-B, B]
         // Sampled from the distribution of Chi of size m
         // therefore e <- X^m where e_i \in [-B, B]
-        let error_eigenvector = sample_error_eigenvector(rng, error_bound, public_key_samples);
+        let error_eigenvector = sample_error_eigenvector(rng, error_bound, sample_size);
 
         // Compute eigenvector b = (B*t + e) mod q
         let body_eigenvector = body(
@@ -206,7 +216,7 @@ impl GswKeyPair {
         // Resultant A matrix \in Z_q of size m x (n + 1)
         let public_augmented_matrix = augment_matrices(&body_eigenvector, &matrix_b);
 
-        GswPublicKey {
+        GswPublicComponent {
             matrix_a: (public_augmented_matrix),
         }
     }
@@ -224,17 +234,17 @@ impl GswKeyPair {
     ///
     /// Returns a public key for encryption and its corresponding secret key
     /// for decryption.
-    pub fn generate_key_pair(parameters: &GswParameters) -> Self {
+    pub fn generate(parameters: &GswParameters) -> Self {
         let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
 
         let private_random_eigenvector_t = generate_private_eigenvector(&mut rng, parameters);
-        let secret_key = Self::generate_secret_key(parameters, &private_random_eigenvector_t);
-        let public_key =
-            Self::generate_public_key(&mut rng, &parameters, &private_random_eigenvector_t);
+        let private_part_gsw = Self::generate_private_component(parameters, &private_random_eigenvector_t);
+        let public_part_gsw =
+            Self::generate_public_component(&mut rng, &parameters, &private_random_eigenvector_t);
 
-        GswKeyPair {
-            public_key,
-            secret_key,
+        GswInstance { 
+            private_component: private_part_gsw,
+            public_component: public_part_gsw,
         }
     }
 }
@@ -279,14 +289,14 @@ fn generate_private_eigenvector(rng: &mut ChaCha20Rng, parameters: &GswParameter
 /// # Panics
 ///
 /// Panics if `message` is not a bit.
-pub fn encrypt_bit(parameters: &GswParameters, pk: &GswPublicKey, message: u8) -> GswCiphertext {
+pub fn encrypt_bit(parameters: &GswParameters, pk: &GswPublicComponent, message: u8) -> GswCiphertext {
     assert!(
         message <= 1,
         "Only supports the encryption of 1-bit messages"
     );
 
     let ciphertext_dimension = parameters.ciphertext_dimension;
-    let public_key_samples = parameters.public_key_samples;
+    let sample_size = parameters.sample_size;
     let ciphertext_modulus = parameters.ciphertext_modulus;
     let matrix_a = pk.matrix_a.to_owned();
 
@@ -305,9 +315,9 @@ pub fn encrypt_bit(parameters: &GswParameters, pk: &GswPublicKey, message: u8) -
     //generate a random N x m matrix R with 0/1 entries
     let mut rng = ChaCha20Rng::from_rng(&mut rand::rng());
 
-    let mut random_binary_matrix_r = vec![vec![0u64; public_key_samples]; ciphertext_dimension];
+    let mut random_binary_matrix_r = vec![vec![0u64; sample_size]; ciphertext_dimension];
     for i in 0..ciphertext_dimension {
-        for j in 0..public_key_samples {
+        for j in 0..sample_size {
             random_binary_matrix_r[i][j] = rng.random_range(0..=1);
         }
     }
@@ -382,7 +392,7 @@ pub fn encrypt_bit(parameters: &GswParameters, pk: &GswPublicKey, message: u8) -
 ///
 /// Panics if the ciphertext or secret-key dimensions do not match the
 /// parameters, or if no suitable coefficient `v_i` is found.
-pub fn decrypt_bit(parameters: &GswParameters, ct: GswCiphertext, sk: &GswSecretKey) -> u8 {
+pub fn decrypt_bit(parameters: &GswParameters, ct: GswCiphertext, sk: &GswPrivateComponent) -> u8 {
     let ciphertext_dimension = parameters.ciphertext_dimension;
     let ciphertext_modulus = parameters.ciphertext_modulus;
     let decomposition_length = parameters.decomposition_length;
