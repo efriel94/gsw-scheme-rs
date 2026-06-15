@@ -1,5 +1,4 @@
 use crate::util::*;
-use faer::prelude::*;
 use rand::RngExt;
 use rand_chacha::{ChaCha20Rng, rand_core::SeedableRng};
 

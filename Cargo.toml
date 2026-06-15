@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-faer = "0.24.0"
 rand = "0.10.0"
 rand_chacha = {version = "0.10.0" , features = ["std"] }
 rand_distr = "0.6.0"

@@ -1,23 +1,19 @@
 # GSW Scheme in Rust
 
-A modular and extensible implementation of the Gentry-Sahai-Waters (GSW) somewhat homomorphic encryption scheme in Rust.
+This is a rust implementation of the levelled-HE GSW (Gentry Sahai Waters) scheme. Currently the implementation only supports encrpyting single bits but will.
 
-This project is in active development but will provide a generic GSW framework designed to support multiple underlying hardness assumptions: LWE, RLWE and NTRU, a range of decomposition strategies and external product constructions.
 
-src/
-├── lwe/
-├── rlwe/
-├── ntru/
-├── lwe_gsw/
-├── rlwe_gsw/
-└── ntru_gsw/
+## Todo
 
-## Problem statement
-
-Applying GSW based techniques is becoming an increasingly popular method to use for building Fully Homomorphic Encryption schemes. To allow rapid user development and experiementation of GSW based FHE schemes there is a lack of open source libraries that provide intuitive interfaces to the GSW scheme. 
-
-The purpose of this project is to enable rapid development from GSW-based somewhat HE scheme to extending upwards to Fully Homomorphic Encryption (FHE) schemes.
-
+- [ ] Extend plaintext space to Z_p to recover any \mu in Z_q
+- [ ] Add LWE based bootstrapping for FHE based version.
+- [ ] Add levelled RLWE based version.
+- [ ] Add RLWE based bootstrapping.
+- [ ] Implement homomorphic NAND, addition, and multiplication operations.
+- [ ] Add correctness tests for key generation, encryption, decryption, and flattening.
+- [ ] Benchmark parameter choices and core matrix operations.
+- [ ] Document supported parameters and security assumptions.
+- [ ] Add examples for encrypting, decrypting, and evaluating simple circuits.
 
 ## References
 
