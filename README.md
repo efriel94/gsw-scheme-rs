@@ -1,6 +1,6 @@
 # GSW Scheme in Rust
 
-This is a rust implementation of the levelled-HE GSW (Gentry Sahai Waters) scheme. Currently the implementation only supports encrpyting single bits but will.
+This is a rust implementation of the levelled-HE GSW (Gentry Sahai Waters) scheme. Currently the implementation only supports encrypting single-bit plaintexts in the message space `{0,1}`.
 
 
 ## Todo
